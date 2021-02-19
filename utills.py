@@ -7,12 +7,12 @@ and calculates number of humans at risk, low risk, no risk according to closenes
 '''
 
 __title__           = "utills.py"
-__Version__         = "1.0"
+__Version__         = "1.1"
 __copyright__       = "Copyright 2020 , Social Distancing AI"
 __license__         = "MIT"
-__author__          = "Deepak Birla"
-__email__           = "birla.deepak26@gmail.com"
-__date__            = "2020/05/29"
+__author__          = "Deepak Birla, Federico Cichetti"
+__email__           = "birla.deepak26@gmail.com, volpepe.prog@gmail.com"
+__date__            = "2021/02/18"
 __python_version__  = "3.5.2"
 
 # imports
@@ -25,7 +25,6 @@ def get_transformed_points(boxes, prespective_transform):
     bottom_points = []
     for box in boxes:
         pnts = np.array([[[int(box[0]+(box[2]*0.5)),int(box[1]+box[3])]]] , dtype="float32")
-        #pnts = np.array([[[int(box[0]+(box[2]*0.5)),int(box[1]+(box[3]*0.5))]]] , dtype="float32")
         bd_pnt = cv2.perspectiveTransform(pnts, prespective_transform)[0][0]
         pnt = [int(bd_pnt[0]), int(bd_pnt[1])]
         bottom_points.append(pnt)
@@ -33,8 +32,8 @@ def get_transformed_points(boxes, prespective_transform):
     return bottom_points
 
 # Function calculates distance between two points(humans). distance_w, distance_h represents number
-# of pixels in 180cm length horizontally and vertically. We calculate horizontal and vertical
-# distance in pixels for two points and get ratio in terms of 180 cm distance using distance_w, distance_h.
+# of pixels in 100cm length horizontally and vertically. We calculate horizontal and vertical
+# distance in pixels for two points and get ratio in terms of 100 cm distance using distance_w, distance_h.
 # Then we calculate how much cm distance is horizontally and vertically and then using pythagoras
 # we calculate distance between points in terms of cm. 
 def cal_dis(p1, p2, distance_w, distance_h):
@@ -42,8 +41,8 @@ def cal_dis(p1, p2, distance_w, distance_h):
     h = abs(p2[1]-p1[1])
     w = abs(p2[0]-p1[0])
     
-    dis_w = float((w/distance_w)*180)
-    dis_h = float((h/distance_h)*180)
+    dis_w = float((w/distance_w)*100)
+    dis_h = float((h/distance_h)*100)
     
     return int(np.sqrt(((dis_h)**2) + ((dis_w)**2)))
 
@@ -57,12 +56,11 @@ def get_distances(boxes1, bottom_points, distance_w, distance_h):
         for j in range(len(bottom_points)):
             if i != j:
                 dist = cal_dis(bottom_points[i], bottom_points[j], distance_w, distance_h)
-                #dist = int((dis*180)/distance)
-                if dist <= 150:
+                if dist <= 100:
                     closeness = 0
                     distance_mat.append([bottom_points[i], bottom_points[j], closeness])
                     bxs.append([boxes1[i], boxes1[j], closeness])
-                elif dist > 150 and dist <=180:
+                elif dist > 100 and dist <=200:
                     closeness = 1
                     distance_mat.append([bottom_points[i], bottom_points[j], closeness])
                     bxs.append([boxes1[i], boxes1[j], closeness])       

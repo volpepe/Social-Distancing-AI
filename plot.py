@@ -6,12 +6,12 @@ for humans in a frame and draw lines between boxes according to risk factor betw
 '''
 
 __title__           = "plot.py"
-__Version__         = "1.0"
+__Version__         = "1.1"
 __copyright__       = "Copyright 2020 , Social Distancing AI"
 __license__         = "MIT"
-__author__          = "Deepak Birla"
-__email__           = "birla.deepak26@gmail.com"
-__date__            = "2020/05/29"
+__author__          = "Deepak Birla, Federico Cichetti"
+__email__           = "birla.deepak26@gmail.com, volpepe.prog@gmail.com"
+__date__            = "2021/02/18"
 __python_version__  = "3.5.2"
 
 # imports
