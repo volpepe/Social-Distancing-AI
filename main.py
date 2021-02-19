@@ -12,12 +12,12 @@ points and then drawing birds eye view and drawing bounding boxes and distance l
 '''
 
 __title__           = "main.py"
-__Version__         = "1.0"
+__Version__         = "1.1"
 __copyright__       = "Copyright 2020 , Social Distancing AI"
 __license__         = "MIT"
-__author__          = "Deepak Birla"
-__email__           = "birla.deepak26@gmail.com"
-__date__            = "2020/05/29"
+__author__          = "Deepak Birla, Federico Cichetti"
+__email__           = "birla.deepak26@gmail.com, volpepe.prog@gmail.com"
+__date__            = "2021/02/18"
 __python_version__  = "3.5.2"
 
 # imports
@@ -25,47 +25,58 @@ import cv2
 import numpy as np
 import time
 import argparse
+import os
 
 # own modules
 import utills, plot
 
 confid = 0.5
 thresh = 0.5
-mouse_pts = []
+pts = []
 
 
-# Function to get points for Region of Interest(ROI) and distance scale. It will take 8 points on first frame using mouse click    
-# event.First four points will define ROI where we want to moniter social distancing. Also these points should form parallel  
-# lines in real world if seen from above(birds eye view). Next 3 points will define 6 feet(unit length) distance in     
+# Function to get points for Region of Interest(ROI) and distance scale. It will take 8 points on first frame using mouse click event.
+# - or from a text file -   
+# First four points will define ROI where we want to moniter social distancing. Also these points should form parallel  
+# lines in real world if seen from above(birds eye view). Next 3 points will define 1 metre(unit length) distance in     
 # horizontal and vertical direction and those should form parallel lines with ROI. Unit length we can take based on choice.
 # Points should pe in pre-defined order - bottom-left, bottom-right, top-right, top-left, point 5 and 6 should form     
 # horizontal line and point 5 and 7 should form verticle line. Horizontal and vertical scale will be different. 
 
-# Function will be called on mouse events                                                          
+def pts_debug():
+    print(pts)
 
+# Function will be called on mouse events                                                          
 def get_mouse_points(event, x, y, flags, param):
 
-    global mouse_pts
+    global pts
     if event == cv2.EVENT_LBUTTONDOWN:
-        if len(mouse_pts) < 4:
+        if len(pts) < 4:
             cv2.circle(image, (x, y), 5, (0, 0, 255), 10)
         else:
             cv2.circle(image, (x, y), 5, (255, 0, 0), 10)
             
-        if len(mouse_pts) >= 1 and len(mouse_pts) <= 3:
-            cv2.line(image, (x, y), (mouse_pts[len(mouse_pts)-1][0], mouse_pts[len(mouse_pts)-1][1]), (70, 70, 70), 2)
-            if len(mouse_pts) == 3:
-                cv2.line(image, (x, y), (mouse_pts[0][0], mouse_pts[0][1]), (70, 70, 70), 2)
+        if len(pts) >= 1 and len(pts) <= 3:
+            cv2.line(image, (x, y), (pts[len(pts)-1][0], pts[len(pts)-1][1]), (70, 70, 70), 2)
+            if len(pts) == 3:
+                cv2.line(image, (x, y), (pts[0][0], pts[0][1]), (70, 70, 70), 2)
         
-        if "mouse_pts" not in globals():
-            mouse_pts = []
-        mouse_pts.append((x, y))
-        #print("Point detected")
-        #print(mouse_pts)
-        
+        if "pts" not in globals():
+            pts = []
+        pts.append((x, y))
+        ## DEBUG ##
+        print("Point detected")
+        pts_debug()
 
+def read_points_from_file(fp):
 
-def calculate_social_distancing(vid_path, net, output_dir, output_vid, ln1):
+    global pts
+    temp = []
+    with open(fp, 'r') as f:
+        temp = f.readlines()
+    pts_debug()
+
+def calculate_social_distancing(vid_path, net, output_dir, output_vid, ln1, points_file = None, viz = True):
     
     count = 0
     vs = cv2.VideoCapture(vid_path)    
@@ -80,8 +91,8 @@ def calculate_social_distancing(vid_path, net, output_dir, output_vid, ln1):
     scale_w, scale_h = utills.get_scale(width, height)
 
     fourcc = cv2.VideoWriter_fourcc(*"XVID")
-    output_movie = cv2.VideoWriter("./output_vid/distancing.avi", fourcc, fps, (width, height))
-    bird_movie = cv2.VideoWriter("./output_vid/bird_eye_view.avi", fourcc, fps, (int(width * scale_w), int(height * scale_h)))
+    output_movie = cv2.VideoWriter(os.path.join("output_vid", "output.avi"), fourcc, fps, (width, height))
+    bird_movie = cv2.VideoWriter(os.path.join("output_vid", "bird_eye_view.avi"), fourcc, fps, (int(width * scale_w), int(height * scale_h)))
         
     points = []
     global image
@@ -98,16 +109,19 @@ def calculate_social_distancing(vid_path, net, output_dir, output_vid, ln1):
         
         # first frame will be used to draw ROI and horizontal and vertical 180 cm distance(unit length in both directions)
         if count == 0:
-            while True:
-                image = frame
-                cv2.imshow("image", image)
-                cv2.waitKey(1)
-                if len(mouse_pts) == 8:
-                    cv2.destroyWindow("image")
-                    break
-               
-            points = mouse_pts      
-                 
+            if points_file == None:
+                while True:
+                    image = frame
+                    cv2.imshow("image", image)
+                    cv2.waitKey(1)
+                    if len(pts) == 8:
+                        cv2.destroyWindow("image")
+                        break
+            else:
+                    read_points_from_file(points_file)
+
+            points = pts      
+
         # Using first 4 points or coordinates for perspective transformation. The region marked by these 4 points are 
         # considered ROI. This polygon shaped ROI is then warped into a rectangle which becomes the bird eye view. 
         # This bird eye view then has the property property that points are distributed uniformally horizontally and 
@@ -118,8 +132,8 @@ def calculate_social_distancing(vid_path, net, output_dir, output_vid, ln1):
         prespective_transform = cv2.getPerspectiveTransform(src, dst)
 
         # using next 3 points for horizontal and vertical unit length(in this case 180 cm)
-        pts = np.float32(np.array([points[4:7]]))
-        warped_pt = cv2.perspectiveTransform(pts, prespective_transform)[0]
+        pnts = np.float32(np.array([points[4:7]]))
+        warped_pt = cv2.perspectiveTransform(pnts, prespective_transform)[0]
         
         # since bird eye view has property that all points are equidistant in horizontal and vertical direction.
         # distance_w and distance_h will give us 180 cm distance in both horizontal and vertical directions
@@ -193,16 +207,19 @@ def calculate_social_distancing(vid_path, net, output_dir, output_vid, ln1):
             output_movie.write(img)
             bird_movie.write(bird_image)
     
-            cv2.imshow('Bird Eye View', bird_image)
+            if viz:
+                cv2.imshow('Bird Eye View', bird_image)
             cv2.imwrite(output_dir+"frame%d.jpg" % count, img)
-            cv2.imwrite(output_dir+"bird_eye_view/frame%d.jpg" % count, bird_image)
+            cv2.imwrite(output_dir+os.path.join("bird_eye_view", "frame%d.jpg" % count), bird_image)
     
         count = count + 1
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+
+        if viz and cv2.waitKey(1) & 0xFF == ord('q'):
             break
-     
-    vs.release()
-    cv2.destroyAllWindows() 
+    
+    if viz:
+        vs.release()
+        cv2.destroyAllWindows() 
         
 
 if __name__== "__main__":
@@ -210,35 +227,45 @@ if __name__== "__main__":
     # Receives arguements specified by user
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('-v', '--video_path', action='store', dest='video_path', default='./data/example.mp4' ,
+    parser.add_argument('-v', '--video_path', action='store', dest='video_path', default=os.path.join('data','example.mp4') ,
                     help='Path for input video')
                     
-    parser.add_argument('-o', '--output_dir', action='store', dest='output_dir', default='./output/' ,
+    parser.add_argument('-o', '--output_dir', action='store', dest='output_dir', default='output' ,
                     help='Path for Output images')
     
-    parser.add_argument('-O', '--output_vid', action='store', dest='output_vid', default='./output_vid/' ,
+    parser.add_argument('-O', '--output_vid', action='store', dest='output_vid', default='output_vid' ,
                     help='Path for Output videos')
 
-    parser.add_argument('-m', '--model', action='store', dest='model', default='./models/',
+    parser.add_argument('-m', '--model', action='store', dest='model', default='models',
                     help='Path for models directory')
                     
     parser.add_argument('-u', '--uop', action='store', dest='uop', default='NO',
                     help='Use open pose or not (YES/NO)')
+
+    parser.add_argument('-g', '--use_gpu', action='store_true', dest='use_gpu',
+                    help='Preferably use GPU for running the YOLO network (needs OpenCV compiled with GPU support)')
+
+    parser.add_argument('-no_viz', '--dont_visualize', action="store_true", dest="no_viz",
+                    help='Don\'t show anything while computing')
+
+    parser.add_argument('-fp', '--points_filename', action="store", dest="fp", default='NO',
+                    help='Grab interest points from file instead of visual inputting via mouse')
                     
     values = parser.parse_args()
     
     model_path = values.model
-    if model_path[len(model_path) - 1] != '/':
-        model_path = model_path + '/'
+    if model_path[len(model_path) - 1] != os.path.sep:
+        model_path = model_path + os.path.sep
         
     output_dir = values.output_dir
-    if output_dir[len(output_dir) - 1] != '/':
-        output_dir = output_dir + '/'
+    if output_dir[len(output_dir) - 1] != os.path.sep:
+        output_dir = output_dir + os.path.sep
     
     output_vid = values.output_vid
-    if output_vid[len(output_vid) - 1] != '/':
-        output_vid = output_vid + '/'
+    if output_vid[len(output_vid) - 1] != os.path.sep:
+        output_vid = output_vid + os.path.sep
 
+    fp = None if values.fp == 'NO' else values.fp
 
     # load Yolov3 weights
     
@@ -246,16 +273,25 @@ if __name__== "__main__":
     configPath = model_path + "yolov3.cfg"
 
     net_yl = cv2.dnn.readNetFromDarknet(configPath, weightsPath)
+
+    # check if we are going to use GPU
+    if values.use_gpu:
+        # set CUDA as the preferable backend and target
+        print("[INFO] setting preferable backend and target to CUDA...")
+        net_yl.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+        net_yl.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+
     ln = net_yl.getLayerNames()
     ln1 = [ln[i[0] - 1] for i in net_yl.getUnconnectedOutLayers()]
 
     # set mouse callback 
 
-    cv2.namedWindow("image")
-    cv2.setMouseCallback("image", get_mouse_points)
+    if not values.no_viz:
+        cv2.namedWindow("image")
+        cv2.setMouseCallback("image", get_mouse_points)
+
     np.random.seed(42)
-    
-    calculate_social_distancing(values.video_path, net_yl, output_dir, output_vid, ln1)
+    calculate_social_distancing(values.video_path, net_yl, output_dir, output_vid, ln1, fp, not values.no_viz)
 
 
 
